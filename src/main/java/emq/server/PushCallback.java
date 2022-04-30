@@ -10,9 +10,10 @@ public class PushCallback implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable throwable) {
+        System.out.println("开始判断是否进入重连");
        /* MqttPushServer mqttPushServer = MqttPushServer.getInstance();
         //在断开连接时使用，主要用于重连
-        System.out.println("开始判断是否进入重连");
+
         do {
             System.out.println("进入重连");
             if (NetUtils.connectTest(PropertiesUtil.prefixUrl)) {

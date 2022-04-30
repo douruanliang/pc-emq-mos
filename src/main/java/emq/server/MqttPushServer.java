@@ -1,4 +1,5 @@
 package emq.server;
+
 import emq.util.PropertiesUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.*;
@@ -9,9 +10,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class MqttPushServer {
 
-    private MqttClient client;
-
+    private MqttClient mqttClient;
     private static volatile MqttPushServer mqttPushClient = null;
+
+    private static MemoryPersistence memoryPersistence = null;
+    private static MqttConnectOptions mqttConnectOptions = null;
     //重连次数
     private int reConnTimes;
 
@@ -35,11 +38,11 @@ public class MqttPushServer {
         return PropertiesUtil.MQTT_RECONNINTERVAL;
     }
 
-    public static MqttPushServer getInstance(){
+    public static MqttPushServer getInstance() {
 
-        if(null == mqttPushClient){
-            synchronized (MqttPushServer.class){
-                if(null == mqttPushClient){
+        if (null == mqttPushClient) {
+            synchronized (MqttPushServer.class) {
+                if (null == mqttPushClient) {
                     mqttPushClient = new MqttPushServer();
                 }
             }
@@ -50,101 +53,221 @@ public class MqttPushServer {
     }
 
     private MqttPushServer() {
-        connect();
+        init();
     }
 
-    public void connect(){
-        try {
-            client = new MqttClient(PropertiesUtil.MQTT_HOST, PropertiesUtil.MQTT_CLIENTID, new MemoryPersistence());
-            MqttConnectOptions options = new MqttConnectOptions();
-            /**
-             * clean session 值为false,既保留会话，那么该客户端上线的时候，并订阅了主题“r”,那么该主题会一直存在，即使客户端离线，该主题也仍然会记忆在EMQ服务器内存。
-             * 当客户端离线又上线时，仍然会接受到离线期间别人发来的publish消息（QOS=0,1,2）.类似及时通讯软件，终端可以接受离线消息。
-             * 除非客户端主动取消订阅主题， 否则主题一直存在。另外，mnesia不会持久化session，subscription和topic，服务器重启则丢失。
 
-             * 当clean session 为true
-             * 该客户端上线，并订阅了主题“r”，那么该主题会随着客户端离线而删除。
-             * 当客户端离线又上线时，接受不到离线期间别人发来的publish消息
-             *
-             * 不管clean session的值是什么，当终端设备离线时，QoS=0,1,2的消息一律接收不到。
-             * 当clean session的值为true，当终端设备离线再上线时，离线期间发来QoS=0,1,2的消息一律接收不到。
-             * 当clean session的值为false，当终端设备离线再上线时，离线期间发来QoS=0,1,2的消息仍然可以接收到。如果同个主题发了多条就接收多条，一条不差，照单全收
-             *
-             */
-            options.setCleanSession(false);
-            /*options.setUserName(PropertiesUtil.MQTT_USER_NAME);
-            options.setPassword(PropertiesUtil.MQTT_PASSWORD.toCharArray());*/
-            options.setConnectionTimeout(PropertiesUtil.MQTT_TIMEOUT);
-            options.setKeepAliveInterval(PropertiesUtil.MQTT_KEEP_ALIVE);
+    public void init() {
+
+        //初始化连接设置对象
+        mqttConnectOptions = new MqttConnectOptions();
+        //初始化MqttClient
+        if (null != mqttConnectOptions) {
+//            true可以安全地使用内存持久性作为客户端断开连接时清除的所有状态
+            mqttConnectOptions.setCleanSession(true);
+//            设置连接超时
+            mqttConnectOptions.setConnectionTimeout(10);
+
+            //设置账号密码
+            //    mqttConnectOptions.setUserName(username);
+            //    mqttConnectOptions.setPassword(password.toCharArray());
+            //    设置持久化方式
+
+            String clientId = PropertiesUtil.MQTT_CLIENTID;
+            memoryPersistence = new MemoryPersistence();
+            if (null != memoryPersistence && null != clientId) {
+                try {
+                    mqttClient = new MqttClient(PropertiesUtil.MQTT_HOST, clientId, memoryPersistence);
+                } catch (MqttException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            } else {
+
+            }
+        } else {
+            System.out.println("mqttConnectOptions对象为空");
+        }
+
+        System.out.println(mqttClient.isConnected());
+        //设置连接和回调
+        if (null != mqttClient) {
+            if (!mqttClient.isConnected()) {
+//            创建连接
+                try {
+                    System.out.println("创建连接");
+                    mqttClient.connect(mqttConnectOptions);
+                } catch (MqttException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+            }
+        } else {
+            System.out.println("mqttClient为空");
+        }
+
+        System.out.println(mqttClient.isConnected());
+
+        if (mqttClient.isConnected()) {
             try {
-                client.setCallback(new PushCallback());
-                client.connect(options);
+                //添加回调方法1
+                mqttClient.setCallback(new PushCallback());
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+
     }
- 
-   
+
+
     /**
-     * 
      * @param qos
-     * @param retained  MQTT客户端向服务器发布(PUBLISH)消息时，
-     * 可以设置保留消息(Retained Message)标志。保留消息(Retained Message)会驻留在消息服务器，后来的订阅者订阅主题时仍可以接收该消息。
+     * @param retained MQTT客户端向服务器发布(PUBLISH)消息时，
+     *                 可以设置保留消息(Retained Message)标志。保留消息(Retained Message)会驻留在消息服务器，后来的订阅者订阅主题时仍可以接收该消息。
      * @param topic
      * @param payload
      */
-    public void publish(int qos,boolean retained,int type,String topic,String payload){
-        MqttMessage message = new MqttMessage();
-        message.setQos(qos);
-        message.setRetained(retained);
-        message.setPayload(payload.getBytes());
-        if(type == 1) { // 1v1
-        	topic = "user/"+topic;
-        }
-        MqttTopic mTopic = client.getTopic(topic);
-        if(null == mTopic){
-           // log.error("topic not exist");
-        	System.out.println("topic not exist");
-        }
-        MqttDeliveryToken token;
-        try {
-            token = mTopic.publish(message);
-            token.waitForCompletion();
-        } catch (Exception e) {
-            e.printStackTrace();
+    public void publish(int qos, boolean retained, String topic, String payload) {
+        if (null != mqttClient && mqttClient.isConnected()) {
+            System.out.println("发布消息   " + mqttClient.isConnected());
+            System.out.println("id:" + mqttClient.getClientId());
+
+            MqttMessage message = new MqttMessage();
+            message.setQos(qos);
+            message.setRetained(retained);
+            message.setPayload(payload.getBytes());
+            MqttTopic mTopic = mqttClient.getTopic(topic);
+            if (null == mTopic) {
+                // log.error("topic not exist");
+                System.out.println("topic not exist");
+            }
+            MqttDeliveryToken token;
+            try {
+                token = mTopic.publish(message);
+                /*if (!token.isComplete()){
+                    System.out.println("消息发布成功");
+                }*/
+                token.waitForCompletion();
+            } catch (MqttException e) {
+                e.printStackTrace();
+            }
+        } else {
+            reConnect();
         }
     }
 
-
+    private void reConnect() {
+        System.out.println("重连 reConnect");
+        if (null != mqttClient) {
+            if (!mqttClient.isConnected()) {
+                if (null != mqttConnectOptions) {
+                    try {
+                        mqttClient.connect(mqttConnectOptions);
+                    } catch (MqttException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                } else {
+                    System.out.println("mqttConnectOptions is null");
+                }
+            } else {
+                System.out.println("mqttClient is null or connect");
+            }
+        } else {
+            init();
+        }
+    }
 
 
     /**
      * 订阅某个主题，qos默认为0
+     *
      * @param topic
      */
-    public void subscribe(String topic){
-        subscribe(topic,0);
+    public void subscribe(String topic) {
+        subscribe(topic, 0);
     }
 
     /**
      * 订阅某个主题
+     *
      * @param topic
      * @param qos
      */
-    public void subscribe(String topic,int qos){
+    public void subscribe(String topic, int qos) {
         try {
-            client.subscribe(topic, qos);
+            mqttClient.subscribe(topic, qos);
         } catch (MqttException e) {
             e.printStackTrace();
         }
     }
-    public boolean isConnected() {
-        return client.isConnected();
+
+    //    订阅主题
+    public void subTopic(String topic) {
+        if (null != mqttClient && mqttClient.isConnected()) {
+            try {
+                mqttClient.subscribe(topic, 1);
+            } catch (MqttException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("mqttClient is error");
+        }
     }
 
+    //    清空主题
+    public void cleanTopic(String topic) {
+        if (null != mqttClient && !mqttClient.isConnected()) {
+            try {
+                mqttClient.unsubscribe(topic);
+            } catch (MqttException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("mqttClient is error");
+        }
+    }
+
+    public boolean isConnected() {
+        return mqttClient.isConnected();
+    }
+
+
+    //    关闭连接
+    public void closeConnect() {
+        //关闭存储方式
+        if (null != memoryPersistence) {
+            try {
+                memoryPersistence.close();
+            } catch (MqttPersistenceException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("memoryPersistence is null");
+        }
+
+//        关闭连接
+        if (null != mqttClient) {
+            if (mqttClient.isConnected()) {
+                try {
+                    mqttClient.disconnect();
+                    mqttClient.close();
+                } catch (MqttException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            } else {
+                System.out.println("mqttClient is not connect");
+            }
+        } else {
+            System.out.println("mqttClient is null");
+        }
+    }
    /* public static void main(String[] args) throws Exception {
         String kdTopic = "demo/topics";
         PushPayload pushMessage = PushPayload.getPushPayloadBuider().setMobile("17637900215")
