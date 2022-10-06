@@ -1,6 +1,7 @@
 package emq.controller;
 
 import emq.bean.BaseResponse;
+import emq.bean.PushPayload;
 import emq.server.MqttPushServer;
 import emq.util.QosType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,17 +18,21 @@ public class EMQController {
 
     private ExecutorService service = Executors.newCachedThreadPool();
 
+    /**
+     *
+     * @param uid
+     * @param type
+     * @param body
+     * @return
+     */
     @PostMapping("/sendMessage")
     public BaseResponse sendMessage(
             @RequestParam(value = "uid", required = true) String uid,
             @RequestParam(value = "type", required = false) int type,
             @RequestParam(value = "body", required = false) String body) {
-
-
-        System.out.println("---mTopic--" + uid + type + body);
         //这里将消息异步处理  使用futuretask，或者使用rabbimq进行异步处理或者spring的异步机制进行处理
         FutureTask futureTask = new FutureTask(() -> {
-            MqttPushServer.getInstance().publish(QosType.QOS_AT_LEAST_ONCE.getNumber(), false, "user/"+uid, body);
+            MqttPushServer.getInstance().publish(type, false, "user/"+uid, body);
             return true;
         });
 
