@@ -131,9 +131,6 @@ public class MqttPushServer {
      */
     public void publish(int qos, boolean retained, String topic, String payload) {
         if (null != mqttClient && mqttClient.isConnected()) {
-            System.out.println("发布消息   " + mqttClient.isConnected());
-            System.out.println("id:" + mqttClient.getClientId());
-
             MqttMessage message = new MqttMessage();
             message.setQos(qos);
             message.setRetained(retained);

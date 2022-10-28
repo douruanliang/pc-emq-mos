@@ -60,7 +60,7 @@ public class EMQController {
             @RequestParam(value = "body", required = false) String body) {
 
 
-        System.out.println("---mTopic--" + gid + type + body);
+        System.out.println("---sendGroupMessage--" + gid + type + body);
         //这里将消息异步处理  使用futuretask，或者使用rabbimq进行异步处理或者spring的异步机制进行处理
         FutureTask futureTask = new FutureTask(() -> {
             MqttPushServer.getInstance().publish(QosType.QOS_AT_LEAST_ONCE.getNumber(), false, "group/"+gid, body);
@@ -75,14 +75,14 @@ public class EMQController {
         try {
             Boolean result = (Boolean) futureTask.get();
             if (result) {
-                msg = "消息发送成功";
+                msg = "群消息发送成功";
 
             } else {
-                msg = "消息推送异常";
+                msg = "群消息推送异常";
             }
             System.out.println(msg);
         } catch (Exception e) {
-            msg = "消息推送异常";
+            msg = "群消息推送异常";
             e.printStackTrace();
         }
         return new BaseResponse(0, msg);
