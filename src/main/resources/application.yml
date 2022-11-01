@@ -2,14 +2,14 @@
 com:
   mqtt:
 
-    host: tcp://192.168.127.170:18830
-    clientid: JavaSample
+    host: tcp://192.168.3.2:1883
+    clientid: PushServer
     topic: demo/topics
     timeout: 10
     keepalive: 20
     maxReconnectTimes: 5
     reconnInterval: 1
-    prefixUrl: http://192.168.127.170:18830
+    prefixUrl: http://192.168.3.2:1883
 
 server:
   port: 9090

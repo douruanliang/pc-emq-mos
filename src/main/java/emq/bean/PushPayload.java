@@ -1,6 +1,7 @@
 package emq.bean;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,9 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * mqtt 消息推送实体
- *
- * @author 魏文思
- * @date 2019/11/14$ 15:52$
  */
 @Slf4j
 @Setter
@@ -18,77 +16,59 @@ import lombok.extern.slf4j.Slf4j;
 public class PushPayload {
 
     //推送类型
-    private String type;
-    //推送对象
-    private String mobile;
-    //标题
-    private String title;
+    private int type;
     //内容
-    private String content;
-    //数量
-    private Integer badge = 1;
-    //铃声
-    private String sound = "default";
-    public PushPayload(String type, String mobile, String title, String content, Integer badge , String sound){
+    private String body;
+
+    public PushPayload(int type, String content) {
         this.type = type;
-        this.mobile = mobile;
-        this.title = title;
-        this.content = content;
-        this.badge = badge;
-        this.sound = sound;
+        this.body = content;
     }
 
-    public static class Builder{
+    public static class Builder {
         //推送类型
-        private String type;
-        //推送对象
-        private String mobile;
-        //标题
-        private String title;
+        private int type;
         //内容
-        private String content;
-        //数量
-        private Integer badge = 1;
-        //铃声
-        private String sound = "default";
+        private String body;
 
-        public Builder setType(String type) {
+        public Builder setType(int type) {
             this.type = type;
             return this;
         }
 
-        public Builder setMobile(String mobile) {
-            this.mobile = mobile;
-            return this;
-        }
+        /* public Builder setMobile(String mobile) {
+             this.mobile = mobile;
+             return this;
+         }
+           public Builder setBadge(Integer badge) {
+             this.badge = badge;
+             return this;
+         }
 
-        public Builder setTitle(String title) {
-            this.title = title;
-            return this;
-        }
-
+         public Builder setSound(String sound) {
+             this.sound = sound;
+             return this;
+         }
+         public Builder setTitle(String title) {
+             this.title = title;
+             return this;
+         }
+ */
         public Builder setContent(String content) {
-            this.content = content;
+            this.body = content;
             return this;
         }
 
-        public Builder setBadge(Integer badge) {
-            this.badge = badge;
-            return this;
+
+        public PushPayload build() {
+            return new PushPayload(type, body);
         }
 
-        public Builder setSound(String sound) {
-            this.sound = sound;
-            return this;
-        }
 
-        public PushPayload bulid(){
-            return new PushPayload(type,mobile,title,content,badge,sound);
-        }
     }
 
 
-    public static Builder getPushPayloadBuider(){
+    public static Builder getPushPayloadBuilder() {
         return new Builder();
     }
 
@@ -97,5 +77,8 @@ public class PushPayload {
     public String toString() {
         return JSON.toJSONString(this, SerializerFeature.DisableCircularReferenceDetect);
     }
+
+
+
 
 }

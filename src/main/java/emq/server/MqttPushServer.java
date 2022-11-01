@@ -1,6 +1,8 @@
 package emq.server;
 
+import emq.bean.PushPayload;
 import emq.util.PropertiesUtil;
+import emq.util.QosType;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -58,7 +60,7 @@ public class MqttPushServer {
 
 
     public void init() {
-
+        System.out.println("--mqtt-- init");
         //初始化连接设置对象
         mqttConnectOptions = new MqttConnectOptions();
         //初始化MqttClient
@@ -88,8 +90,6 @@ public class MqttPushServer {
         } else {
             System.out.println("mqttConnectOptions对象为空");
         }
-
-        System.out.println(mqttClient.isConnected());
         //设置连接和回调
         if (null != mqttClient) {
             if (!mqttClient.isConnected()) {
@@ -107,7 +107,7 @@ public class MqttPushServer {
             System.out.println("mqttClient为空");
         }
 
-        System.out.println(mqttClient.isConnected());
+        System.out.println("连接成功否："+mqttClient.isConnected());
 
         if (mqttClient.isConnected()) {
             try {
@@ -119,6 +119,7 @@ public class MqttPushServer {
                 subscribe("$SYS/broker/clients/connected");
 
             } catch (Exception e) {
+                System.out.println("--mqttClient--"+ e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -127,18 +128,19 @@ public class MqttPushServer {
 
 
     /**
-     * @param qos
+     * @param type
      * @param retained MQTT客户端向服务器发布(PUBLISH)消息时，
      *                 可以设置保留消息(Retained Message)标志。保留消息(Retained Message)会驻留在消息服务器，后来的订阅者订阅主题时仍可以接收该消息。
      * @param topic
-     * @param payload
+     * @param body 这是一个 json - string
      */
-    public void publish(int qos, boolean retained, String topic, String payload) {
+    public void publish(int type, boolean retained, String topic, String body) {
         if (null != mqttClient && mqttClient.isConnected()) {
             MqttMessage message = new MqttMessage();
-            message.setQos(qos);
+            message.setQos(QosType.QOS_AT_LEAST_ONCE.getNumber());
             message.setRetained(retained);
-            message.setPayload(payload.getBytes());
+            message.setPayload(body.getBytes());
+
             MqttTopic mTopic = mqttClient.getTopic(topic);
             if (null == mTopic) {
                 // log.error("topic not exist");
@@ -269,9 +271,9 @@ public class MqttPushServer {
             System.out.println("mqttClient is null");
         }
     }
-   /* public static void main(String[] args) throws Exception {
+   /*public static void main(String[] args) throws Exception {
         String kdTopic = "demo/topics";
-        PushPayload pushMessage = PushPayload.getPushPayloadBuider().setMobile("17637900215")
+        PushPayload pushMessage = PushPayload.getPushPayloadBuider()
                 .setContent("designModel")
                 .bulid();
         MqttPushServer.getInstance().publish(0, false, kdTopic, pushMessage);
