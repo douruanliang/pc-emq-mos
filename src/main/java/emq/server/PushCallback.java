@@ -40,10 +40,12 @@ public class PushCallback implements MqttCallback {
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
         //服务端不用关心，客户端的业务
+        System.out.println("接收消息主题 : " + topic);
+        System.out.println("接收消息内容 : " + new String(message.getPayload()));
         // subscribe后得到的消息会执行到这里面
        /* System.out.println("接收消息主题 : " + topic);
         System.out.println("接收消息Qos : " + message.getQos());
-        System.out.println("接收消息内容 : " + new String(message.getPayload()));*/
+        ;*/
 
     }
 }

@@ -114,6 +114,10 @@ public class MqttPushServer {
                 //添加回调方法1
                 mqttClient.setCallback(new PushCallback());
 
+                mqttClient.subscribe("$SYS/broker/clients/expired");
+
+                subscribe("$SYS/broker/clients/connected");
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
