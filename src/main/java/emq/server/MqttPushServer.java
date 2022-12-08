@@ -1,6 +1,5 @@
 package emq.server;
 
-import emq.bean.PushPayload;
 import emq.util.PropertiesUtil;
 import emq.util.QosType;
 import lombok.extern.slf4j.Slf4j;
@@ -32,13 +31,6 @@ public class MqttPushServer {
         this.reConnTimes = reConnTimes;
     }
 
-    public int getMaxReconnTimes() {
-        return PropertiesUtil.MQTT_MAXRECONNECTTIMES;
-    }
-
-    public int getReconnInterval() {
-        return PropertiesUtil.MQTT_RECONNINTERVAL;
-    }
 
     public static MqttPushServer getInstance() {
 
@@ -59,43 +51,32 @@ public class MqttPushServer {
     }
 
 
+    /**
+     * 初始化MqttClient
+     */
     public void init() {
-        System.out.println("--mqtt-- init");
+        System.out.println("--mqttClient-- init");
         //初始化连接设置对象
         mqttConnectOptions = new MqttConnectOptions();
-        //初始化MqttClient
-        if (null != mqttConnectOptions) {
-//            true可以安全地使用内存持久性作为客户端断开连接时清除的所有状态
-            mqttConnectOptions.setCleanSession(true);
-//            设置连接超时
-            mqttConnectOptions.setConnectionTimeout(10);
-
-            //设置账号密码
-            //    mqttConnectOptions.setUserName(username);
-            //    mqttConnectOptions.setPassword(password.toCharArray());
-            //    设置持久化方式
-
-            String clientId = PropertiesUtil.MQTT_CLIENTID;
-            memoryPersistence = new MemoryPersistence();
-            if (null != memoryPersistence && null != clientId) {
-                try {
-                    mqttClient = new MqttClient(PropertiesUtil.MQTT_HOST, clientId, memoryPersistence);
-                } catch (MqttException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            } else {
-
-            }
-        } else {
-            System.out.println("mqttConnectOptions对象为空");
-        }
-        //设置连接和回调
-        if (null != mqttClient) {
+        //true可以安全地使用内存持久性作为客户端断开连接时清除的所有状态
+        mqttConnectOptions.setCleanSession(true);
+        //设置连接超时
+        mqttConnectOptions.setConnectionTimeout(10);
+        //自动重连
+        //mqttConnectOptions.setAutomaticReconnect(true);
+        String clientId = "server";
+        //设置账号密码
+        mqttConnectOptions.setUserName(clientId);
+        mqttConnectOptions.setPassword(clientId.toCharArray());
+        //    设置持久化方式
+        memoryPersistence = new MemoryPersistence();
+        try {
+            mqttClient = new MqttClient(PropertiesUtil.MQTT_HOST, clientId, memoryPersistence);
+            //设置连接和回调
             if (!mqttClient.isConnected()) {
 //            创建连接
                 try {
-                    System.out.println("创建连接");
+                    System.out.println("--mqttClient-- 创建连接");
                     mqttClient.connect(mqttConnectOptions);
                 } catch (MqttException e) {
                     // TODO Auto-generated catch block
@@ -103,11 +84,12 @@ public class MqttPushServer {
                 }
 
             }
-        } else {
-            System.out.println("mqttClient为空");
+        } catch (MqttException e) {
+            e.printStackTrace();
+            System.out.println("--mqttClient-- MqttException" + e.getMessage());
         }
 
-        System.out.println("连接成功否："+mqttClient.isConnected());
+        System.out.println("--mqttClient-- 连接成功否：" + mqttClient.isConnected());
 
         if (mqttClient.isConnected()) {
             try {
@@ -119,7 +101,7 @@ public class MqttPushServer {
                 subscribe("$SYS/broker/clients/connected");
 
             } catch (Exception e) {
-                System.out.println("--mqttClient--"+ e.getMessage());
+                System.out.println("--mqttClient--" + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -132,37 +114,44 @@ public class MqttPushServer {
      * @param retained MQTT客户端向服务器发布(PUBLISH)消息时，
      *                 可以设置保留消息(Retained Message)标志。保留消息(Retained Message)会驻留在消息服务器，后来的订阅者订阅主题时仍可以接收该消息。
      * @param topic
-     * @param body 这是一个 json - string
+     * @param body     这是一个 json - string
      */
     public void publish(int type, boolean retained, String topic, String body) {
-        if (null != mqttClient && mqttClient.isConnected()) {
+
+        if (null != mqttClient) {
+            if (!mqttClient.isConnected()) {
+                try {
+                    reconnect();
+                } catch (MqttException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             MqttMessage message = new MqttMessage();
             message.setQos(QosType.QOS_AT_LEAST_ONCE.getNumber());
             message.setRetained(retained);
             message.setPayload(body.getBytes());
-
             MqttTopic mTopic = mqttClient.getTopic(topic);
             if (null == mTopic) {
-                // log.error("topic not exist");
                 System.out.println("topic not exist");
             }
             MqttDeliveryToken token;
-            try {
-                token = mTopic.publish(message);
-                /*if (!token.isComplete()){
-                    System.out.println("消息发布成功");
-                }*/
-                token.waitForCompletion();
-            } catch (MqttException e) {
-                e.printStackTrace();
+
+            synchronized (this){
+                try {
+                    assert mTopic != null;
+                    token = mTopic.publish(message);
+                    token.waitForCompletion(1000L);
+                } catch (MqttException e) {
+                    System.out.println("MqttException" + e.getMessage());
+                    e.printStackTrace();
+                }
             }
-        } else {
-            reConnect();
+
         }
     }
 
-    private void reConnect() {
-        System.out.println("重连 reConnect");
+    public void reconnect() throws MqttException {
+        System.out.println("重连 reconnect");
         if (null != mqttClient) {
             if (!mqttClient.isConnected()) {
                 if (null != mqttConnectOptions) {
@@ -176,6 +165,8 @@ public class MqttPushServer {
                     System.out.println("mqttConnectOptions is null");
                 }
             } else {
+                mqttClient.disconnect();;
+                mqttClient.connect(mqttConnectOptions);
                 System.out.println("mqttClient is null or connect");
             }
         } else {
@@ -271,12 +262,5 @@ public class MqttPushServer {
             System.out.println("mqttClient is null");
         }
     }
-   /*public static void main(String[] args) throws Exception {
-        String kdTopic = "demo/topics";
-        PushPayload pushMessage = PushPayload.getPushPayloadBuider()
-                .setContent("designModel")
-                .bulid();
-        MqttPushServer.getInstance().publish(0, false, kdTopic, pushMessage);
 
-    }*/
 }

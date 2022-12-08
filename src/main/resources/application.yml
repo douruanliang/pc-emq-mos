@@ -1,15 +1,19 @@
-
-com:
+spring:
+  application:
+    name:mq-provider
   mqtt:
-
-    host: tcp://192.168.3.2:1883
-    clientid: PushServer
-    topic: demo/topics
+    host: tcp://192.168.159.50:18830
+    username: push
+    password: pushAdmin
+    client:
+      id: PushServer
+    default:
+      topic: defaultTopic
     timeout: 10
     keepalive: 20
     maxReconnectTimes: 5
     reconnInterval: 1
-    prefixUrl: http://192.168.3.2:1883
+    prefixUrl: http://192.168.159.50:18830
 
 server:
   port: 9090

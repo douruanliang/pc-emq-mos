@@ -2,50 +2,32 @@ package emq.server;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PushCallback implements MqttCallback {
 
+    private static final Logger log = LoggerFactory.getLogger(PushCallback.class);
     @Override
     public void connectionLost(Throwable throwable) {
-        System.out.println("开始判断是否进入重连");
-       /* MqttPushServer mqttPushServer = MqttPushServer.getInstance();
-        //在断开连接时使用，主要用于重连
-
-        do {
-            System.out.println("进入重连");
-            if (NetUtils.connectTest(PropertiesUtil.prefixUrl)) {
-                mqttPushServer.connect();
-                mqttPushServer.setReConnTimes(mqttPushServer.getReConnTimes() + 1);
-            }
-
-            try {
-                TimeUnit.SECONDS.sleep((long) mqttPushServer.getReconnInterval());
-
-            } catch (InterruptedException var3) {
-                System.out.println("重连出现异常");
-                var3.printStackTrace();
-            }
-        } while (!mqttPushServer.isConnected() && mqttPushServer.getReConnTimes() < mqttPushServer.getMaxReconnTimes());
-        System.out.println("重试成功！！！");*/
+        log.error("mqtt connectionLost 连接断开，5S之后尝试重连: {}", throwable.getMessage());
+       // MsgJobManager.getInstance().addJob(new MqttConnectJob());
     }
 
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
+        log.info("==========deliveryComplete={}==========", token.isComplete());
     }
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
         //服务端不用关心，客户端的业务
-        System.out.println("接收消息主题 : " + topic);
-        System.out.println("接收消息内容 : " + new String(message.getPayload()));
+        log.info("接收消息主题 : " + topic);
+        log.info("接收消息内容 : " + new String(message.getPayload()));
         // subscribe后得到的消息会执行到这里面
-       /* System.out.println("接收消息主题 : " + topic);
-        System.out.println("接收消息Qos : " + message.getQos());
-        ;*/
-
     }
 }
